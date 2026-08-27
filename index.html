@@ -2191,7 +2191,27 @@
         isSpinning = true;
         spinBtn.disabled = true;
 
-        const winningIndex = Math.floor(Math.random() * 8);
+        // Weighted random: ô Giảm 29% (index 3) chỉ 5%, các ô còn lại phân bổ hợp lý
+        // Tổng tỉ lệ = 100%. Cấu hình tỉ lệ trúng từng ô:
+        //   Ô 0 (Bimbim)        : 12%
+        //   Ô 1 (Giảm 10%)      : 18%
+        //   Ô 2 (Giảm 15%)      : 15%
+        //   Ô 3 (Giảm 29%)      :  5%  ← hiếm
+        //   Ô 4 (Tặng Topping)  : 18%
+        //   Ô 5 (Giảm 10%)      : 16%
+        //   Ô 6 (Tặng Topping)  : 16%
+        const prizeWeights = [12, 18, 15, 5, 18, 16, 16];
+        const totalWeight = prizeWeights.reduce((a, b) => a + b, 0); // 100
+        let winningIndex;
+        const pick = Math.random() * totalWeight;
+        let cumulative = 0;
+        for (let i = 0; i < prizeWeights.length; i++) {
+            cumulative += prizeWeights[i];
+            if (pick < cumulative) {
+                winningIndex = i;
+                break;
+            }
+        }
         const segmentAngle = 360 / 8;
         const halfSegment = segmentAngle / 2;
         const safeRandomOffset = (Math.random() * 20 - 10);
