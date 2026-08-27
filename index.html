@@ -2603,10 +2603,18 @@
         createConfetti();
         createSparkles();
         createFireworks();
+        // 🎺 Trúng thưởng → mở to Tuyên Ngôn Độc Lập 100%
+        if (typeof window.playTuyenNgonLoud === 'function') {
+            window.playTuyenNgonLoud();
+        }
     }
 
     function closeModal() {
         modalOverlay.classList.remove('active');
+        // 🎺 Đóng modal → giảm volume Tuyên Ngôn về 30%
+        if (typeof window.softenTuyenNgon === 'function') {
+            window.softenTuyenNgon();
+        }
     }
 
     function createConfetti() {
@@ -2733,6 +2741,9 @@
 
         let userInteracted = false;
         let userWantsSound = false;  // user đã chủ động bật
+        let isLoudForWin   = false; // đang mở to vì trúng thưởng
+        const SOFT_VOLUME = 0.3;    // 30% bình thường
+        const LOUD_VOLUME = 1.0;    // 100% khi trúng thưởng
 
         function updateBtn() {
             const playing = !audio.muted && !audio.paused;
@@ -2791,6 +2802,40 @@
             console.warn('[Tuyên Ngôn] Không tải được file audio:', audio.src);
             btn.style.display = 'none';
         });
+
+        // ============================================
+        // 🎯 API cho showResult() gọi khi trúng thưởng
+        // ============================================
+
+        // Mở to 100% + phát từ đầu (khi quay trúng)
+        window.playTuyenNgonLoud = function() {
+            if (!audio) return;
+            audio.muted = false;
+            audio.volume = LOUD_VOLUME;
+            isLoudForWin = true;
+            userWantsSound = true;
+            userInteracted = true;
+            // Restart from beginning để nghe lại từ "Tôi... đọc bản Tuyên Ngôn..."
+            try {
+                audio.currentTime = 0;
+            } catch (e) {}
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(err => {
+                    console.warn('[Tuyên Ngôn] Không phát được:', err);
+                });
+            }
+            updateBtn();
+        };
+
+        // Giảm về 30% (sau khi đóng modal kết quả)
+        window.softenTuyenNgon = function() {
+            if (!audio) return;
+            if (!isLoudForWin) return;  // user đang tự điều khiển thì không đụng
+            audio.volume = SOFT_VOLUME;
+            isLoudForWin = false;
+            updateBtn();
+        };
 
         updateBtn();
     })();
