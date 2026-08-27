@@ -2038,10 +2038,7 @@
         isSpinning = true;
         spinBtn.disabled = true;
 
-        // 🎺 Fade-in volume khi bắt đầu quay
-        if (typeof window.boostForSpin === 'function') {
-            window.boostForSpin();
-        }
+        // Volume giữ cố định 30% suốt toàn trang — không fade khi quay
 
         // ===== TỶ LỆ TRÚNG THƯỞNG (Weighted Random - 8 ô) =====
         // Index 4 = ô "Giảm 29%" chỉ 0.5% → trung bình 200 lần quay mới trúng 1 lần
@@ -2119,18 +2116,12 @@
         createConfetti();
         createSparkles();
         createFireworks();
-        // 🎺 Trúng thưởng → giữ Tuyên Ngôn ở 80%, restart từ đầu
-        if (typeof window.playTuyenNgonLoud === 'function') {
-            window.playTuyenNgonLoud();
-        }
+        // Tuyên Ngôn vẫn chạy nền tự nhiên — không reset/boost khi trúng
     }
 
     function closeModal() {
         modalOverlay.classList.remove('active');
-        // 🎺 Đóng modal → fade giảm về 30%
-        if (typeof window.softenTuyenNgon === 'function') {
-            window.softenTuyenNgon();
-        }
+        // Tuyên Ngôn vẫn chạy nền — không điều chỉnh volume
     }
 
     function createConfetti() {
@@ -2196,9 +2187,9 @@
 
     <!-- ============================================
          NHẠC NỀN: ĐỌC BẢN TUYÊN NGÔN ĐỘC LẬP
-         - Lặp lại (loop), volume 30% bình thường
-         - Fade lên 80% khi quay, giữ 80% khi trúng thưởng, về 30% khi đóng modal
+         - Lặp lại (loop), volume cố định 30%
          - Tự phát sau click/touch đầu tiên
+         - KHÔNG điều chỉnh volume khi quay / trúng thưởng / đóng modal
          ============================================ -->
     <audio id="tuyenNgonAudio"
            src="assets/tuyen-ngon-doc-lap.mp3"
@@ -2232,39 +2223,12 @@
         const btn      = document.getElementById('tnSoundBtn');
         if (!bgmAudio || !tickAudio || !btn) return;
 
-        const VOL_BASE      = 0.3;   // 30% bình thường (nhạt nhẹ)
-        const VOL_SPIN      = 0.8;   // 80% khi đang quay
-        const VOL_WIN       = 0.8;   // 80% khi trúng thưởng (giữ nguyên)
-        const VOL_AFTER_WIN = 0.3;   // 30% sau khi đóng modal
-
-        bgmAudio.volume = VOL_BASE;
+        // Volume cố định 30% suốt toàn trang — không fade khi quay / trúng / đóng modal
+        bgmAudio.volume = 0.3;
         bgmAudio.muted  = true;
         tickAudio.volume = 0.5;
 
         let userInteracted = false;
-        let fadeRaf = null;
-
-        // ===== FADE MƯỢT GIỮA 2 MỨC ÂM LƯỢNG =====
-        function fadeVolume(audio, fromV, toV, durationMs) {
-            // Hủy fade cũ nếu đang chạy
-            if (fadeRaf) {
-                cancelAnimationFrame(fadeRaf);
-                fadeRaf = null;
-            }
-            const start = performance.now();
-            const step = (now) => {
-                const elapsed = now - start;
-                const t = Math.min(1, elapsed / durationMs);
-                audio.volume = fromV + (toV - fromV) * t;
-                if (t < 1) {
-                    fadeRaf = requestAnimationFrame(step);
-                } else {
-                    audio.volume = toV;
-                    fadeRaf = null;
-                }
-            };
-            fadeRaf = requestAnimationFrame(step);
-        }
 
         function updateBtn() {
             if (bgmAudio.muted) {
@@ -2309,7 +2273,7 @@
             }
             userInteracted = true;
             bgmAudio.muted = false;
-            bgmAudio.volume = VOL_BASE;
+            bgmAudio.volume = 0.3;
             ensurePlaying();
             updateBtn();
         }
@@ -2322,35 +2286,9 @@
 
         // Phát tiếng "tích" theo mỗi nấc 45 độ (gọi từ spin())
         window.playTick = function() {
-            // Mỗi lần tick dùng currentTime = 0 để phát lại từ đầu (kể cả khi file đang chạy)
             try { tickAudio.currentTime = 0; } catch (e) {}
             const p = tickAudio.play();
             if (p && typeof p.catch === 'function') p.catch(() => {});
-        };
-
-        // Bấm QUAY → fade từ BASE lên SPIN
-        window.boostForSpin = function() {
-            userInteracted = true;
-            bgmAudio.muted = false;
-            ensurePlaying();
-            fadeVolume(bgmAudio, bgmAudio.volume, VOL_SPIN, 600);
-            updateBtn();
-        };
-
-        // Trúng thưởng → giữ nguyên SPIN, restart từ đầu
-        window.playTuyenNgonLoud = function() {
-            userInteracted = true;
-            bgmAudio.muted = false;
-            try { bgmAudio.currentTime = 0; } catch (e) {}
-            fadeVolume(bgmAudio, bgmAudio.volume, VOL_WIN, 300);
-            ensurePlaying();
-            updateBtn();
-        };
-
-        // Đóng modal → giảm về BASE
-        window.softenTuyenNgon = function() {
-            if (bgmAudio.muted) return;
-            fadeVolume(bgmAudio, bgmAudio.volume, VOL_AFTER_WIN, 600);
         };
 
         // Lỗi tải audio → ẩn nút
