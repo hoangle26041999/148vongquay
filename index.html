@@ -973,6 +973,103 @@
             letter-spacing: 0.3px;
         }
 
+        /* Banner lớn phía trên vòng quay + bảng CƠ HỘI NHẬN */
+        .opportunity-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin: 8px auto 22px;
+            padding: 14px 22px;
+            max-width: 620px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde047 50%, #facc15 100%);
+            border: 3px solid #15803d;
+            border-radius: 18px;
+            box-shadow:
+                0 6px 20px rgba(21,128,61,0.25),
+                inset 0 0 0 2px #fff,
+                inset 0 0 0 4px #fde047;
+            text-align: center;
+            position: relative;
+            animation: bannerPulse 2s ease-in-out infinite;
+        }
+
+        .opportunity-banner::before,
+        .opportunity-banner::after {
+            content: "⭐";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.4rem;
+            color: #da251d;
+            text-shadow: 0 0 8px rgba(253,224,71,0.8);
+            animation: bannerStar 1.5s ease-in-out infinite;
+        }
+        .opportunity-banner::before { left: 8px; }
+        .opportunity-banner::after  { right: 8px; animation-delay: 0.75s; }
+
+        @keyframes bannerPulse {
+            0%, 100% { transform: scale(1);    box-shadow: 0 6px 20px rgba(21,128,61,0.25), inset 0 0 0 2px #fff, inset 0 0 0 4px #fde047; }
+            50%      { transform: scale(1.025); box-shadow: 0 10px 28px rgba(21,128,61,0.45), inset 0 0 0 2px #fff, inset 0 0 0 4px #fde047; }
+        }
+
+        @keyframes bannerStar {
+            0%, 100% { opacity: 0.4; transform: translateY(-50%) scale(1);    }
+            50%      { opacity: 1;   transform: translateY(-50%) scale(1.4);  }
+        }
+
+        .opportunity-banner .banner-icon {
+            font-size: 1.8rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .opportunity-banner .banner-text {
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: #7f1d1d;
+            letter-spacing: 0.3px;
+            text-shadow: 0 1px 0 #fff, 0 2px 4px rgba(0,0,0,0.1);
+            line-height: 1.3;
+        }
+
+        .opportunity-banner .banner-amount {
+            display: inline-block;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg, #da251d 0%, #b91c1c 100%);
+            padding: 2px 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(218,37,29,0.5);
+            margin: 0 2px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            transform: rotate(-3deg);
+            animation: amountWiggle 1.5s ease-in-out infinite;
+        }
+
+        @keyframes amountWiggle {
+            0%, 100% { transform: rotate(-3deg) scale(1);    }
+            50%      { transform: rotate(-3deg) scale(1.1);  }
+        }
+
+        @media (max-width: 600px) {
+            .opportunity-banner {
+                gap: 8px;
+                padding: 10px 14px;
+                margin: 6px auto 14px;
+            }
+            .opportunity-banner .banner-icon { font-size: 1.4rem; }
+            .opportunity-banner .banner-text { font-size: 0.92rem; }
+            .opportunity-banner .banner-amount { font-size: 1.2rem; padding: 1px 9px; }
+            .opportunity-banner::before,
+            .opportunity-banner::after { font-size: 1rem; }
+        }
+
+        @media (max-width: 400px) {
+            .opportunity-banner .banner-text { font-size: 0.82rem; }
+            .opportunity-banner .banner-amount { font-size: 1.05rem; }
+        }
+
         .opportunity-panel .panel-title .title-emoji {
             filter: drop-shadow(0 0 4px rgba(253,224,71,0.6));
         }
@@ -1531,6 +1628,13 @@
             <span class="deco-palace">🏛️</span>
         </div>
 
+        <!-- Banner Hoá đơn từ 50K - nằm trên cả vòng quay + bảng CƠ HỘI NHẬN -->
+        <div class="opportunity-banner">
+            <span class="banner-icon">🧾</span>
+            <span class="banner-text">Hoá đơn từ <span class="banner-amount">50K</span> là có cơ hội nhận quà!</span>
+            <span class="banner-icon">🎁</span>
+        </div>
+
         <!-- Layout 2 cột: Bảng trái - Vòng quay - Bảng phải -->
         <div class="content-grid">
 
@@ -1555,7 +1659,6 @@
                     <span class="title-emoji">🎁</span>
                     <span>CƠ HỘI NHẬN</span>
                 </div>
-                <div class="opportunity-subtitle">Hoá đơn từ 50k</div>
                 <ul class="prizes-list" id="opportunityList">
                     <!-- Render từ JS -->
                 </ul>
