@@ -2191,16 +2191,16 @@
         isSpinning = true;
         spinBtn.disabled = true;
 
-        // Weighted random: ô Giảm 29% (index 3) chỉ 0.5% → trung bình 200 lần quay mới trúng 1 lần
+        // Weighted random: ô Giảm 29% (index 3) = 0% → KHÔNG BAO GIỜ trúng
         // Tổng tỉ lệ = 100%. Cấu hình tỉ lệ trúng từng ô:
         //   Ô 0 (Bimbim)        : 12%
-        //   Ô 1 (Giảm 10%)      : 19.7%
+        //   Ô 1 (Giảm 10%)      : 19.8%
         //   Ô 2 (Giảm 15%)      : 15.6%
-        //   Ô 3 (Giảm 29%)      :  0.5%  ← cực hiếm (1/200 lần)
-        //   Ô 4 (Tặng Topping)  : 19.7%
-        //   Ô 5 (Giảm 10%)      : 16.7%
+        //   Ô 3 (Giảm 29%)      :  0%   ← KHÔNG trúng
+        //   Ô 4 (Tặng Topping)  : 19.8%
+        //   Ô 5 (Giảm 10%)      : 17%
         //   Ô 6 (Tặng Topping)  : 15.8%
-        const prizeWeights = [12, 19.7, 15.6, 0.5, 19.7, 16.7, 15.8];
+        const prizeWeights = [12, 19.8, 15.6, 0, 19.8, 17, 15.8];
         const totalWeight = prizeWeights.reduce((a, b) => a + b, 0); // 100
         let winningIndex;
         const pick = Math.random() * totalWeight;
