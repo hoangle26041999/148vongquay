@@ -1349,6 +1349,15 @@
             padding: 3px 12px;
             border-radius: 12px;
             box-shadow: 0 2px 6px rgba(24,119,242,0.4);
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        .contact-fb:hover {
+            background: linear-gradient(135deg, #0d6efd 0%, #1877f2 100%);
+            color: #fde047;
+            transform: scale(1.08);
+            box-shadow: 0 4px 12px rgba(24,119,242,0.7);
         }
         .contact-phone {
             color: #fde047;
@@ -1607,7 +1616,7 @@
                 <div class="contact-row">
                     <span class="contact-icon">📩</span>
                     <span class="contact-label">Ứng tuyển:</span>
-                    <span class="contact-value contact-fb">FB GREENTEA</span>
+                    <a href="https://www.facebook.com/profile.php?id=100057058345509" target="_blank" rel="noopener" class="contact-value contact-fb">FB GREENTEA</a>
                 </div>
                 <div class="contact-row">
                     <span class="contact-icon">📞</span>
