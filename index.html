@@ -2066,39 +2066,189 @@
 
         playWin() {
             if (!this.ctx || !this.soundOn) return;
-            const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1046.50, 783.99, 1046.50];
-            let time = this.ctx.currentTime;
-            notes.forEach((freq, i) => {
-                [freq, freq * 2].forEach(f => {
+            const t0 = this.ctx.currentTime;
+
+            // ===== FANFARE "TRAO GIẢI HOÀNH TRÁNG" (~4.2s) =====
+            // Phase 1 (0–0.6s): Chord dồn năng lượng + cymbal roll
+            // Phase 2 (0.6–1.6s): Câu chính fanfare đi lên (C5-C5-E5-G5)
+            // Phase 3 (1.85–2.8s): Lặp lại octave cao + drum roll
+            // Phase 4 (3.0–4.2s): Final chord hoành tráng + cymbal crash + kick
+
+            const winGain = this.ctx.createGain();
+            winGain.gain.value = 0.55;
+            winGain.connect(this.ctx.destination);
+
+            // ----- PHASE 1: Chord dồn C-E-G-C -----
+            const chordNotes = [261.63, 329.63, 392.00, 523.25];
+            chordNotes.forEach(freq => {
+                ['sawtooth', 'square', 'triangle'].forEach((wtype, wi) => {
                     const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = i < 4 ? 'triangle' : 'sine';
-                    osc.frequency.value = f;
-                    const duration = 0.2;
-                    gain.gain.setValueAtTime(0, time);
-                    gain.gain.linearRampToValueAtTime(0.25, time + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start(time);
-                    osc.stop(time + duration);
+                    const g = this.ctx.createGain();
+                    osc.type = wtype;
+                    osc.frequency.value = freq;
+                    g.gain.setValueAtTime(0, t0);
+                    g.gain.linearRampToValueAtTime(0.18 - wi * 0.04, t0 + 0.05);
+                    g.gain.linearRampToValueAtTime(0, t0 + 0.6);
+                    osc.connect(g); g.connect(winGain);
+                    osc.start(t0); osc.stop(t0 + 0.6);
                 });
-                time += 0.15;
+            });
+            // Cymbal roll
+            for (let n = 0; n < 6; n++) {
+                const t = t0 + n * 0.04;
+                const noise = this.ctx.createBufferSource();
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.05, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.1));
+                noise.buffer = buf;
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass'; hp.frequency.value = 8000;
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0.08, t);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                noise.connect(hp); hp.connect(ng); ng.connect(winGain);
+                noise.start(t); noise.stop(t + 0.05);
+            }
+
+            // ----- PHASE 2: Fanfare chính C5-C5-E5-G5 -----
+            const fanfare1 = [
+                { f: 523.25, t: 0.60, d: 0.22 },
+                { f: 523.25, t: 0.82, d: 0.22 },
+                { f: 659.25, t: 1.04, d: 0.22 },
+                { f: 783.99, t: 1.26, d: 0.55 }
+            ];
+            fanfare1.forEach(({ f, t, d }) => {
+                const startT = t0 + t;
+                // Trumpet lead
+                const osc = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.value = f;
+                g.gain.setValueAtTime(0, startT);
+                g.gain.linearRampToValueAtTime(0.4, startT + 0.02);
+                g.gain.linearRampToValueAtTime(0.3, startT + d * 0.6);
+                g.gain.linearRampToValueAtTime(0, startT + d);
+                osc.connect(g); g.connect(winGain);
+                osc.start(startT); osc.stop(startT + d);
+                // Octave cao brilliance
+                const osc2 = this.ctx.createOscillator();
+                const g2 = this.ctx.createGain();
+                osc2.type = 'square';
+                osc2.frequency.value = f * 2;
+                g2.gain.setValueAtTime(0, startT);
+                g2.gain.linearRampToValueAtTime(0.15, startT + 0.02);
+                g2.gain.linearRampToValueAtTime(0, startT + d * 0.7);
+                osc2.connect(g2); g2.connect(winGain);
+                osc2.start(startT); osc2.stop(startT + d * 0.8);
+            });
+            // Brass hit mỗi nốt
+            [0.60, 0.82, 1.04, 1.26].forEach(t => {
+                const startT = t0 + t;
+                const noise = this.ctx.createBufferSource();
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.08, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.1));
+                noise.buffer = buf;
+                const lp = this.ctx.createBiquadFilter();
+                lp.type = 'lowpass'; lp.frequency.value = 3000;
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0.3, startT);
+                ng.gain.exponentialRampToValueAtTime(0.001, startT + 0.1);
+                noise.connect(lp); lp.connect(ng); ng.connect(winGain);
+                noise.start(startT); noise.stop(startT + 0.1);
             });
 
-            for (let i = 0; i < 4; i++) {
+            // ----- PHASE 3: Fanfare cao octave (C6-C6-E6-G6) + drum roll -----
+            const fanfare2 = [
+                { f: 1046.50, t: 1.85, d: 0.20 },
+                { f: 1046.50, t: 2.05, d: 0.20 },
+                { f: 1318.51, t: 2.25, d: 0.20 },
+                { f: 1567.98, t: 2.45, d: 0.50 }
+            ];
+            fanfare2.forEach(({ f, t, d }) => {
+                const startT = t0 + t;
+                const osc = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.value = f;
+                g.gain.setValueAtTime(0, startT);
+                g.gain.linearRampToValueAtTime(0.45, startT + 0.02);
+                g.gain.linearRampToValueAtTime(0.35, startT + d * 0.6);
+                g.gain.linearRampToValueAtTime(0, startT + d);
+                osc.connect(g); g.connect(winGain);
+                osc.start(startT); osc.stop(startT + d);
+                const osc2 = this.ctx.createOscillator();
+                const g2 = this.ctx.createGain();
+                osc2.type = 'square';
+                osc2.frequency.value = f * 2;
+                g2.gain.setValueAtTime(0, startT);
+                g2.gain.linearRampToValueAtTime(0.2, startT + 0.02);
+                g2.gain.linearRampToValueAtTime(0, startT + d * 0.7);
+                osc2.connect(g2); g2.connect(winGain);
+                osc2.start(startT); osc2.stop(startT + d * 0.8);
+            });
+            // Drum roll 12 hits
+            for (let n = 0; n < 12; n++) {
+                const t = t0 + 1.55 + n * 0.025;
                 const noise = this.ctx.createBufferSource();
-                const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.1, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let j = 0; j < data.length; j++) {
-                    data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.1));
-                }
-                noise.buffer = buffer;
-                const noiseGain = this.ctx.createGain();
-                noiseGain.gain.value = 0.15;
-                noise.connect(noiseGain);
-                noiseGain.connect(this.ctx.destination);
-                noise.start(this.ctx.currentTime + i * 0.3);
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.02, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.05));
+                noise.buffer = buf;
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass'; hp.frequency.value = 5000;
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0.12, t);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+                noise.connect(hp); hp.connect(ng); ng.connect(winGain);
+                noise.start(t); noise.stop(t + 0.02);
+            }
+
+            // ----- PHASE 4: FINAL CHORD HOÀNH TRÁNG -----
+            const finalChord = [261.63, 329.63, 392.00, 523.25, 1046.50];
+            finalChord.forEach((freq, idx) => {
+                ['sawtooth', 'triangle', 'sine'].forEach((wtype, wi) => {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = wtype;
+                    osc.frequency.value = freq;
+                    const startT = t0 + 3.0;
+                    g.gain.setValueAtTime(0, startT);
+                    g.gain.linearRampToValueAtTime(0.3 / (idx + 1), startT + 0.05);
+                    g.gain.linearRampToValueAtTime(0.3 / (idx + 1), startT + 0.8);
+                    g.gain.linearRampToValueAtTime(0, startT + 1.2);
+                    osc.connect(g); g.connect(winGain);
+                    osc.start(startT); osc.stop(startT + 1.2);
+                });
+            });
+            // Cymbal crash cuối
+            {
+                const startT = t0 + 3.0;
+                const noise = this.ctx.createBufferSource();
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 1.0, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.25));
+                noise.buffer = buf;
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass'; hp.frequency.value = 5000;
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0.4, startT);
+                ng.gain.exponentialRampToValueAtTime(0.001, startT + 1.0);
+                noise.connect(hp); hp.connect(ng); ng.connect(winGain);
+                noise.start(startT); noise.stop(startT + 1.0);
+            }
+            // Kick thump cuối
+            {
+                const startT = t0 + 3.0;
+                const k = this.ctx.createOscillator();
+                const kg = this.ctx.createGain();
+                k.type = 'sine';
+                k.frequency.setValueAtTime(180, startT);
+                k.frequency.exponentialRampToValueAtTime(0.01, startT + 0.15);
+                kg.gain.setValueAtTime(0.7, startT);
+                kg.gain.exponentialRampToValueAtTime(0.001, startT + 0.2);
+                k.connect(kg); kg.connect(winGain);
+                k.start(startT); k.stop(startT + 0.2);
             }
         },
 
