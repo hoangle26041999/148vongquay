@@ -2191,33 +2191,34 @@
         isSpinning = true;
         spinBtn.disabled = true;
 
-        // Weighted random: ô Giảm 29% (index 3) = 0% → KHÔNG BAO GIỜ trúng
-        // Tổng tỉ lệ = 100%. Cấu hình tỉ lệ trúng từng ô:
-        //   Ô 0 (Bimbim)        : 12%
-        //   Ô 1 (Giảm 10%)      : 19.8%
-        //   Ô 2 (Giảm 15%)      : 15.6%
-        //   Ô 3 (Giảm 29%)      :  0%   ← KHÔNG trúng
-        //   Ô 4 (Tặng Topping)  : 19.8%
-        //   Ô 5 (Giảm 10%)      : 17%
-        //   Ô 6 (Tặng Topping)  : 15.8%
-        const prizeWeights = [12, 19.8, 15.6, 0, 19.8, 17, 15.8];
-        const totalWeight = prizeWeights.reduce((a, b) => a + b, 0); // 100
-        let winningIndex;
-        const pick = Math.random() * totalWeight;
-        let cumulative = 0;
-        for (let i = 0; i < prizeWeights.length; i++) {
-            cumulative += prizeWeights[i];
-            if (pick < cumulative) {
+        // ===== TỶ LỆ TRÚNG THƯỞNG (Weighted Random - 8 ô) =====
+        // Index 4 = ô "Giảm 29%" chỉ 0.5% → trung bình 200 lần quay mới trúng 1 lần
+        // Các ô còn lại ~14.214% mỗi ô, tổng = 100%
+        const weights = [14.214, 14.214, 14.214, 14.214, 0.5, 14.214, 14.214, 14.214];
+
+        // Chọn ô trúng theo trọng số
+        let random = Math.random() * 100;
+        let winningIndex = 0;
+        let weightSum = 0;
+        for (let i = 0; i < weights.length; i++) {
+            weightSum += weights[i];
+            if (random <= weightSum) {
                 winningIndex = i;
                 break;
             }
         }
-        const segmentAngle = 360 / 8;
-        const halfSegment = segmentAngle / 2;
-        const safeRandomOffset = (Math.random() * 20 - 10);
 
-        const targetAngle = (360 - (winningIndex * segmentAngle) - halfSegment) + safeRandomOffset;
+        // ===== GÓC QUAY CHÍNH XÁC VÀO GIỮA LÒNG Ô =====
+        // Mỗi ô = 45 độ, lệch giữa = 22.5 độ
+        // Thêm offset ngẫu nhiên (-8° → +8°) để kim đâm sâu vào lòng ô (tránh dính vạch)
+        const segmentAngle = 45;
+        const halfSegment = 22.5;
+        const randomOffset = (Math.random() * 16) - 8;
+
+        // Tính góc đích đưa ô trúng về đúng vị trí kim (đỉnh 12h)
+        const targetAngle = (360 - (winningIndex * segmentAngle) - halfSegment) + randomOffset;
         const delta = targetAngle - (currentRotation % 360);
+        // Cộng ít nhất 6 vòng quay đầy đủ (2160°) + delta
         currentRotation = currentRotation + 2160 + delta;
 
         wheel.style.transition = `transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)`;
