@@ -2068,187 +2068,209 @@
             if (!this.ctx || !this.soundOn) return;
             const t0 = this.ctx.currentTime;
 
-            // ===== FANFARE "TRAO GIẢI HOÀNH TRÁNG" (~4.2s) =====
-            // Phase 1 (0–0.6s): Chord dồn năng lượng + cymbal roll
-            // Phase 2 (0.6–1.6s): Câu chính fanfare đi lên (C5-C5-E5-G5)
-            // Phase 3 (1.85–2.8s): Lặp lại octave cao + drum roll
-            // Phase 4 (3.0–4.2s): Final chord hoành tráng + cymbal crash + kick
+            // ===== NHẠC CÁCH MẠNG HÀO HÙNG - "VIỆT NAM QUÊ HƯƠNG TÔI" =====
+            // Tổng thời lượng: ~14s
+            //   0–2.5s   : Intro dàn nhạc (trống marching + chord C)
+            //   2.5–5.7s : Câu lời 1 - Giai điệu mở đầu (lời: "Việt Nam quê hương tôi")
+            //   6.0–9.4s : Câu lời 2 - Giai điệu phát triển (lời: "Hỡi người chiến sĩ")
+            //   10.0–13.5s: Câu lời 3 - HOÀNH TRÁNG kết thúc (lời: "Chúc mừng chiến thắng")
+            //   13.5s    : Cymbal crash kết thúc
 
             const winGain = this.ctx.createGain();
             winGain.gain.value = 0.55;
             winGain.connect(this.ctx.destination);
 
-            // ----- PHASE 1: Chord dồn C-E-G-C -----
-            const chordNotes = [261.63, 329.63, 392.00, 523.25];
-            chordNotes.forEach(freq => {
-                ['sawtooth', 'square', 'triangle'].forEach((wtype, wi) => {
-                    const osc = this.ctx.createOscillator();
-                    const g = this.ctx.createGain();
-                    osc.type = wtype;
-                    osc.frequency.value = freq;
-                    g.gain.setValueAtTime(0, t0);
-                    g.gain.linearRampToValueAtTime(0.18 - wi * 0.04, t0 + 0.05);
-                    g.gain.linearRampToValueAtTime(0, t0 + 0.6);
-                    osc.connect(g); g.connect(winGain);
-                    osc.start(t0); osc.stop(t0 + 0.6);
-                });
-            });
-            // Cymbal roll
-            for (let n = 0; n < 6; n++) {
-                const t = t0 + n * 0.04;
+            // ============================================================
+            // INTRO (0 → 2.5s): Trống marching + chord C-E-G-C vang vọng
+            // ============================================================
+            for (let n = 0; n < 8; n++) {
+                const t = t0 + n * 0.3;
+                // Kick trống lớn (marching bass drum)
+                const k = this.ctx.createOscillator();
+                const kg = this.ctx.createGain();
+                k.type = 'sine';
+                k.frequency.setValueAtTime(120, t);
+                k.frequency.exponentialRampToValueAtTime(0.01, t + 0.2);
+                kg.gain.setValueAtTime(0.7, t);
+                kg.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                k.connect(kg); kg.connect(winGain);
+                k.start(t); k.stop(t + 0.25);
+                // Snare
                 const noise = this.ctx.createBufferSource();
-                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.05, this.ctx.sampleRate);
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.15, this.ctx.sampleRate);
                 const data = buf.getChannelData(0);
-                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.1));
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.15));
                 noise.buffer = buf;
-                const hp = this.ctx.createBiquadFilter();
-                hp.type = 'highpass'; hp.frequency.value = 8000;
+                const nf = this.ctx.createBiquadFilter();
+                nf.type = 'highpass'; nf.frequency.value = 2000;
                 const ng = this.ctx.createGain();
-                ng.gain.setValueAtTime(0.08, t);
-                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-                noise.connect(hp); hp.connect(ng); ng.connect(winGain);
-                noise.start(t); noise.stop(t + 0.05);
+                ng.gain.setValueAtTime(0.4, t);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                noise.connect(nf); nf.connect(ng); ng.connect(winGain);
+                noise.start(t); noise.stop(t + 0.15);
             }
-
-            // ----- PHASE 2: Fanfare chính C5-C5-E5-G5 -----
-            const fanfare1 = [
-                { f: 523.25, t: 0.60, d: 0.22 },
-                { f: 523.25, t: 0.82, d: 0.22 },
-                { f: 659.25, t: 1.04, d: 0.22 },
-                { f: 783.99, t: 1.26, d: 0.55 }
-            ];
-            fanfare1.forEach(({ f, t, d }) => {
-                const startT = t0 + t;
-                // Trumpet lead
-                const osc = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.value = f;
-                g.gain.setValueAtTime(0, startT);
-                g.gain.linearRampToValueAtTime(0.4, startT + 0.02);
-                g.gain.linearRampToValueAtTime(0.3, startT + d * 0.6);
-                g.gain.linearRampToValueAtTime(0, startT + d);
-                osc.connect(g); g.connect(winGain);
-                osc.start(startT); osc.stop(startT + d);
-                // Octave cao brilliance
-                const osc2 = this.ctx.createOscillator();
-                const g2 = this.ctx.createGain();
-                osc2.type = 'square';
-                osc2.frequency.value = f * 2;
-                g2.gain.setValueAtTime(0, startT);
-                g2.gain.linearRampToValueAtTime(0.15, startT + 0.02);
-                g2.gain.linearRampToValueAtTime(0, startT + d * 0.7);
-                osc2.connect(g2); g2.connect(winGain);
-                osc2.start(startT); osc2.stop(startT + d * 0.8);
-            });
-            // Brass hit mỗi nốt
-            [0.60, 0.82, 1.04, 1.26].forEach(t => {
-                const startT = t0 + t;
-                const noise = this.ctx.createBufferSource();
-                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.08, this.ctx.sampleRate);
-                const data = buf.getChannelData(0);
-                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.1));
-                noise.buffer = buf;
-                const lp = this.ctx.createBiquadFilter();
-                lp.type = 'lowpass'; lp.frequency.value = 3000;
-                const ng = this.ctx.createGain();
-                ng.gain.setValueAtTime(0.3, startT);
-                ng.gain.exponentialRampToValueAtTime(0.001, startT + 0.1);
-                noise.connect(lp); lp.connect(ng); ng.connect(winGain);
-                noise.start(startT); noise.stop(startT + 0.1);
-            });
-
-            // ----- PHASE 3: Fanfare cao octave (C6-C6-E6-G6) + drum roll -----
-            const fanfare2 = [
-                { f: 1046.50, t: 1.85, d: 0.20 },
-                { f: 1046.50, t: 2.05, d: 0.20 },
-                { f: 1318.51, t: 2.25, d: 0.20 },
-                { f: 1567.98, t: 2.45, d: 0.50 }
-            ];
-            fanfare2.forEach(({ f, t, d }) => {
-                const startT = t0 + t;
-                const osc = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.value = f;
-                g.gain.setValueAtTime(0, startT);
-                g.gain.linearRampToValueAtTime(0.45, startT + 0.02);
-                g.gain.linearRampToValueAtTime(0.35, startT + d * 0.6);
-                g.gain.linearRampToValueAtTime(0, startT + d);
-                osc.connect(g); g.connect(winGain);
-                osc.start(startT); osc.stop(startT + d);
-                const osc2 = this.ctx.createOscillator();
-                const g2 = this.ctx.createGain();
-                osc2.type = 'square';
-                osc2.frequency.value = f * 2;
-                g2.gain.setValueAtTime(0, startT);
-                g2.gain.linearRampToValueAtTime(0.2, startT + 0.02);
-                g2.gain.linearRampToValueAtTime(0, startT + d * 0.7);
-                osc2.connect(g2); g2.connect(winGain);
-                osc2.start(startT); osc2.stop(startT + d * 0.8);
-            });
-            // Drum roll 12 hits
-            for (let n = 0; n < 12; n++) {
-                const t = t0 + 1.55 + n * 0.025;
-                const noise = this.ctx.createBufferSource();
-                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.02, this.ctx.sampleRate);
-                const data = buf.getChannelData(0);
-                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.05));
-                noise.buffer = buf;
-                const hp = this.ctx.createBiquadFilter();
-                hp.type = 'highpass'; hp.frequency.value = 5000;
-                const ng = this.ctx.createGain();
-                ng.gain.setValueAtTime(0.12, t);
-                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
-                noise.connect(hp); hp.connect(ng); ng.connect(winGain);
-                noise.start(t); noise.stop(t + 0.02);
-            }
-
-            // ----- PHASE 4: FINAL CHORD HOÀNH TRÁNG -----
-            const finalChord = [261.63, 329.63, 392.00, 523.25, 1046.50];
-            finalChord.forEach((freq, idx) => {
+            // Chord vang vọng
+            [130.81, 196.00, 261.63, 392.00].forEach(freq => {
                 ['sawtooth', 'triangle', 'sine'].forEach((wtype, wi) => {
                     const osc = this.ctx.createOscillator();
                     const g = this.ctx.createGain();
                     osc.type = wtype;
                     osc.frequency.value = freq;
-                    const startT = t0 + 3.0;
-                    g.gain.setValueAtTime(0, startT);
-                    g.gain.linearRampToValueAtTime(0.3 / (idx + 1), startT + 0.05);
-                    g.gain.linearRampToValueAtTime(0.3 / (idx + 1), startT + 0.8);
-                    g.gain.linearRampToValueAtTime(0, startT + 1.2);
+                    g.gain.setValueAtTime(0, t0);
+                    g.gain.linearRampToValueAtTime(0.18 - wi * 0.04, t0 + 0.1);
+                    g.gain.linearRampToValueAtTime(0.15, t0 + 1.0);
+                    g.gain.linearRampToValueAtTime(0, t0 + 2.5);
                     osc.connect(g); g.connect(winGain);
-                    osc.start(startT); osc.stop(startT + 1.2);
+                    osc.start(t0); osc.stop(t0 + 2.5);
                 });
             });
-            // Cymbal crash cuối
+            // Brass mở đầu G4-C5
+            [{ f: 392.00, t: 1.5, d: 0.5 }, { f: 523.25, t: 2.0, d: 0.5 }].forEach(({ f, t, d }) => {
+                const startT = t0 + t;
+                const osc = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.value = f;
+                g.gain.setValueAtTime(0, startT);
+                g.gain.linearRampToValueAtTime(0.35, startT + 0.05);
+                g.gain.linearRampToValueAtTime(0.25, startT + d * 0.5);
+                g.gain.linearRampToValueAtTime(0, startT + d);
+                osc.connect(g); g.connect(winGain);
+                osc.start(startT); osc.stop(startT + d);
+            });
+
+            // ============================================================
+            // GIAI ĐIỆU 3 CÂU (lấy cảm hứng "Nối vòng tay lớn" / "Việt Nam quê hương tôi")
+            // Hợp âm đệm: C-Am-F-G
+            // ============================================================
+            const melody1 = [
+                { f: 523, t: 2.5, d: 0.4 }, { f: 587, t: 2.9, d: 0.4 },
+                { f: 659, t: 3.3, d: 0.4 }, { f: 587, t: 3.7, d: 0.6 },
+                { f: 523, t: 4.3, d: 0.5 }, { f: 440, t: 4.8, d: 0.4 },
+                { f: 494, t: 5.2, d: 0.4 }, { f: 523, t: 5.6, d: 0.7 }
+            ];
+            const melody2 = [
+                { f: 587, t: 6.0, d: 0.4 }, { f: 659, t: 6.4, d: 0.4 },
+                { f: 698, t: 6.8, d: 0.4 }, { f: 659, t: 7.2, d: 0.4 },
+                { f: 587, t: 7.6, d: 0.4 }, { f: 523, t: 8.0, d: 0.4 },
+                { f: 440, t: 8.4, d: 0.4 }, { f: 494, t: 8.8, d: 0.6 },
+                { f: 523, t: 9.4, d: 0.6 }
+            ];
+            const melody3 = [
+                { f: 659, t: 10.0, d: 0.4 }, { f: 784, t: 10.4, d: 0.4 },
+                { f: 880, t: 10.8, d: 0.4 }, { f: 784, t: 11.2, d: 0.4 },
+                { f: 659, t: 11.6, d: 0.4 }, { f: 523, t: 12.0, d: 1.5 }
+            ];
+
+            // Phát giai điệu lead (flute + brass)
+            [...melody1, ...melody2, ...melody3].forEach(({ f, t, d }) => {
+                const startT = t0 + t;
+                const flute = this.ctx.createOscillator();
+                const fg = this.ctx.createGain();
+                flute.type = 'triangle';
+                flute.frequency.value = f;
+                fg.gain.setValueAtTime(0, startT);
+                fg.gain.linearRampToValueAtTime(0.32, startT + 0.05);
+                fg.gain.linearRampToValueAtTime(0.25, startT + d * 0.5);
+                fg.gain.linearRampToValueAtTime(0, startT + d);
+                flute.connect(fg); fg.connect(winGain);
+                flute.start(startT); flute.stop(startT + d);
+                const brass = this.ctx.createOscillator();
+                const bg = this.ctx.createGain();
+                brass.type = 'sawtooth';
+                brass.frequency.value = f * 2;
+                bg.gain.setValueAtTime(0, startT);
+                bg.gain.linearRampToValueAtTime(0.12, startT + 0.05);
+                bg.gain.linearRampToValueAtTime(0, startT + d * 0.6);
+                brass.connect(bg); bg.connect(winGain);
+                brass.start(startT); brass.stop(startT + d * 0.7);
+            });
+
+            // Hợp âm đệm (C-Am-F-G xoay vòng)
+            [
+                { f: [261, 329, 392], t: 2.5, d: 3.5 },
+                { f: [220, 261, 329], t: 6.0, d: 3.5 },
+                { f: [174, 220, 261], t: 9.5, d: 1.5 },
+                { f: [196, 247, 294], t: 11.0, d: 1.5 }
+            ].forEach(({ f, t, d }) => {
+                const startT = t0 + t;
+                f.forEach(freq => {
+                    ['sawtooth', 'triangle'].forEach((wtype, wi) => {
+                        const osc = this.ctx.createOscillator();
+                        const g = this.ctx.createGain();
+                        osc.type = wtype;
+                        osc.frequency.value = freq;
+                        g.gain.setValueAtTime(0, startT);
+                        g.gain.linearRampToValueAtTime(0.25 / (wi + 1), startT + 0.1);
+                        g.gain.linearRampToValueAtTime(0.2 / (wi + 1), startT + d * 0.5);
+                        g.gain.linearRampToValueAtTime(0, startT + d);
+                        osc.connect(g); g.connect(winGain);
+                        osc.start(startT); osc.stop(startT + d);
+                    });
+                });
+            });
+
+            // Drums đệm nhịp liên tục
+            for (let n = 8; n < 28; n++) {
+                const t = t0 + n * 0.5;
+                const k = this.ctx.createOscillator();
+                const kg = this.ctx.createGain();
+                k.type = 'sine';
+                k.frequency.setValueAtTime(100, t);
+                k.frequency.exponentialRampToValueAtTime(0.01, t + 0.15);
+                kg.gain.setValueAtTime(0.5, t);
+                kg.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                k.connect(kg); kg.connect(winGain);
+                k.start(t); k.stop(t + 0.2);
+            }
+
+            // Cymbal crash kết thúc
             {
-                const startT = t0 + 3.0;
+                const startT = t0 + 13.5;
                 const noise = this.ctx.createBufferSource();
-                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 1.0, this.ctx.sampleRate);
+                const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 1.2, this.ctx.sampleRate);
                 const data = buf.getChannelData(0);
-                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.25));
+                for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (data.length * 0.3));
                 noise.buffer = buf;
                 const hp = this.ctx.createBiquadFilter();
                 hp.type = 'highpass'; hp.frequency.value = 5000;
                 const ng = this.ctx.createGain();
-                ng.gain.setValueAtTime(0.4, startT);
-                ng.gain.exponentialRampToValueAtTime(0.001, startT + 1.0);
+                ng.gain.setValueAtTime(0.5, startT);
+                ng.gain.exponentialRampToValueAtTime(0.001, startT + 1.2);
                 noise.connect(hp); hp.connect(ng); ng.connect(winGain);
-                noise.start(startT); noise.stop(startT + 1.0);
+                noise.start(startT); noise.stop(startT + 1.2);
             }
-            // Kick thump cuối
-            {
-                const startT = t0 + 3.0;
-                const k = this.ctx.createOscillator();
-                const kg = this.ctx.createGain();
-                k.type = 'sine';
-                k.frequency.setValueAtTime(180, startT);
-                k.frequency.exponentialRampToValueAtTime(0.01, startT + 0.15);
-                kg.gain.setValueAtTime(0.7, startT);
-                kg.gain.exponentialRampToValueAtTime(0.001, startT + 0.2);
-                k.connect(kg); kg.connect(winGain);
-                k.start(startT); k.stop(startT + 0.2);
+
+            // ============================================================
+            // LỜI CÁCH MẠNG (Web Speech API - giọng tiếng Việt hào hùng)
+            // ============================================================
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const lyrics = [
+                    { text: 'Việt Nam! Quê hương tôi!',         start: 2.5 },
+                    { text: 'Hỡi người chiến sĩ, hãy vươn vai đứng lên!', start: 6.0 },
+                    { text: 'Chúc mừng bạn đã chiến thắng!',     start: 10.0 }
+                ];
+                lyrics.forEach(({ text, start }) => {
+                    setTimeout(() => {
+                        if (!this.soundOn) return;
+                        const utter = new SpeechSynthesisUtterance(text);
+                        utter.lang = 'vi-VN';
+                        utter.rate = 0.95;
+                        utter.pitch = 1.0;
+                        utter.volume = 1.0;
+                        const voices = window.speechSynthesis.getVoices();
+                        const viVoice = voices.find(v => v.lang.startsWith('vi'));
+                        if (viVoice) utter.voice = viVoice;
+                        window.speechSynthesis.speak(utter);
+                    }, start * 1000);
+                });
+            }
+        },
+
+        stopSpeech() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
             }
         },
 
@@ -2579,6 +2601,7 @@
         SoundEngine.soundOn = !SoundEngine.soundOn;
         soundBtn.textContent = SoundEngine.soundOn ? '🔊 Hiệu ứng: BẬT' : '🔊 Hiệu ứng: TẮT';
         if (SoundEngine.soundOn) SoundEngine.playClick();
+        else SoundEngine.stopSpeech();
     });
 
     spinBtn.addEventListener('click', spin);
