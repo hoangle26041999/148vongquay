@@ -1572,6 +1572,85 @@
             .pointer-flag { width: 55px; height: 65px; }
             .pointer-star { width: 24px; height: 24px; top: 5px; }
         }
+
+        /* ============================================
+           NÚT LOA BẬT/TẮT NHẠC NỀN TUYÊN NGÔN
+           - Góc trên bên phải, nhỏ gọn, tinh tế
+           ============================================ */
+        .tn-sound-toggle {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid #fde047;
+            background: rgba(218, 37, 29, 0.85);  /* đỏ cờ */
+            color: #fde047;                        /* vàng sao */
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding: 0;
+            line-height: 1;
+            font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+            user-select: none;
+        }
+        .tn-sound-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+            background: rgba(218, 37, 29, 1);
+        }
+        .tn-sound-toggle:active {
+            transform: scale(0.95);
+        }
+        .tn-sound-toggle.muted {
+            background: rgba(60, 60, 60, 0.85);
+            border-color: #999;
+            color: #ddd;
+        }
+        /* Tooltip nhỏ hiện khi hover */
+        .tn-sound-toggle::after {
+            content: attr(data-tip);
+            position: absolute;
+            top: 50%;
+            right: calc(100% + 8px);
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fde047;
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .tn-sound-toggle:hover::after {
+            opacity: 1;
+        }
+        /* Pulse animation khi đang phát */
+        .tn-sound-toggle.playing::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid #fde047;
+            opacity: 0.6;
+            animation: tn-pulse 2s ease-out infinite;
+            pointer-events: none;
+        }
+        @keyframes tn-pulse {
+            0%   { transform: scale(1);    opacity: 0.6; }
+            100% { transform: scale(1.5);  opacity: 0;   }
+        }
     </style>
 </head>
 <body>
@@ -2620,6 +2699,102 @@
             src="https://www.youtube.com/embed/atq9S7pp1rQ?autoplay=1&loop=1&playlist=atq9S7pp1rQ&controls=0&showinfo=0&modestbranding=1&disablekb=1&fs=0&iv_load_policy=3&rel=0"
             allow="autoplay; encrypted-media"
             style="position:fixed;bottom:0;right:0;width:1px;height:1px;border:0;opacity:0.01;pointer-events:none;z-index:-1;"></iframe>
+
+    <!-- ============================================
+         NHẠC NỀN: ĐỌC BẢN TUYÊN NGÔN ĐỘC LẬP
+         - Lặp lại (loop), volume 30%
+         - Tự phát sau click đầu tiên
+         ============================================ -->
+    <audio id="tuyenNgonAudio"
+           src="assets/tuyen-ngon-doc-lap.mp3"
+           preload="auto"
+           loop></audio>
+
+    <!-- NÚT LOA BẬT/TẮT (mute/unmute) - góc trên phải -->
+    <button id="tnSoundBtn"
+            class="tn-sound-toggle muted"
+            data-tip="Bật Tuyên Ngôn Độc Lập"
+            aria-label="Bật/tắt nhạc nền Tuyên Ngôn"
+            title="Bật/tắt nhạc nền Tuyên Ngôn Độc Lập">🔇</button>
+
+    <script>
+    // ============================================
+    // TUYEN NGON DOC LAP - SOUND CONTROLLER
+    // Tuân thủ Autoplay Policy: chỉ phát sau tương tác
+    // ============================================
+    (function() {
+        const audio = document.getElementById('tuyenNgonAudio');
+        const btn   = document.getElementById('tnSoundBtn');
+        if (!audio || !btn) return;
+
+        // Cấu hình âm lượng dịu nhẹ, vừa phải
+        audio.volume = 0.3;
+        audio.muted  = true;  // Bắt đầu MUTED (đợi tương tác)
+
+        let userInteracted = false;
+        let userWantsSound = false;  // user đã chủ động bật
+
+        function updateBtn() {
+            const playing = !audio.muted && !audio.paused;
+            if (audio.muted) {
+                btn.classList.add('muted');
+                btn.classList.remove('playing');
+                btn.textContent = '🔇';
+                btn.setAttribute('data-tip', 'Bật Tuyên Ngôn Độc Lập');
+            } else {
+                btn.classList.remove('muted');
+                btn.classList.add('playing');
+                btn.textContent = '🔊';
+                btn.setAttribute('data-tip', 'Tắt Tuyên Ngôn Độc Lập');
+            }
+        }
+
+        function tryPlay() {
+            audio.muted = false;
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(() => {
+                    // Nếu trình duyệt vẫn chặn → fallback muted autoplay
+                    audio.muted = true;
+                    audio.play().catch(() => {});
+                });
+            }
+        }
+
+        // Click nút loa
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userWantsSound = true;
+            userInteracted = true;
+            audio.muted = !audio.muted;
+            if (audio.muted) {
+                audio.pause();
+            } else {
+                tryPlay();
+            }
+            updateBtn();
+        });
+
+        // Tự động thử phát khi user click bất kỳ đâu lần đầu (chính sách Autoplay)
+        const firstInteraction = () => {
+            if (userInteracted) return;
+            userInteracted = true;
+            // Không ép phát - chờ user bấm nút loa (tôn trọng quyết định)
+            // Nhưng nếu user đã bấm QUAY thì thử phát nếu đã bật
+            if (userWantsSound) tryPlay();
+        };
+        document.body.addEventListener('click', firstInteraction, { once: true });
+        document.body.addEventListener('touchstart', firstInteraction, { once: true, passive: true });
+
+        // Lỗi tải audio → fallback ẩn nút
+        audio.addEventListener('error', () => {
+            console.warn('[Tuyên Ngôn] Không tải được file audio:', audio.src);
+            btn.style.display = 'none';
+        });
+
+        updateBtn();
+    })();
+    </script>
 
 </body>
 </html>
