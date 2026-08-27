@@ -2038,6 +2038,11 @@
         isSpinning = true;
         spinBtn.disabled = true;
 
+        // 🎺 Fade-in volume khi bắt đầu quay
+        if (typeof window.boostForSpin === 'function') {
+            window.boostForSpin();
+        }
+
         // ===== TỶ LỆ TRÚNG THƯỞNG (Weighted Random - 8 ô) =====
         // Index 4 = ô "Giảm 29%" chỉ 0.5% → trung bình 200 lần quay mới trúng 1 lần
         // Các ô còn lại ~14.214% mỗi ô, tổng = 100%
@@ -2056,8 +2061,6 @@
         }
 
         // ===== GÓC QUAY CHÍNH XÁC VÀO GIỮA LÒNG Ô =====
-        // Mỗi ô = 45 độ, lệch giữa = 22.5 độ
-        // Thêm offset ngẫu nhiên (-8° → +8°) để kim đâm sâu vào lòng ô (tránh dính vạch)
         const segmentAngle = 45;
         const halfSegment = 22.5;
         const randomOffset = (Math.random() * 16) - 8;
@@ -2070,6 +2073,36 @@
 
         wheel.style.transition = `transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)`;
         wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+        // ===== TIẾNG TÍCH THEO MỖI NẤC 45 ĐỘ =====
+        // Vòng quay quay 2160°+delta ÷ 45° ≈ 48+ nấc
+        // Dùng animation (requestAnimationFrame) để theo dõi góc thực tế
+        let lastTickAngle = currentRotation - 2160 - delta; // góc bắt đầu
+        const totalRotation = 2160 + delta;
+        const startTime = performance.now();
+        const totalDuration = 4000; // ms - khớp với transition ở trên
+
+        const tickLoop = () => {
+            if (!isSpinning) return;
+            const elapsed = performance.now() - startTime;
+            const t = Math.min(1, elapsed / totalDuration);
+            // easing cubic-bezier(0.17, 0.67, 0.12, 0.99) - xấp xỉ ease-out mạnh
+            // Để đơn giản và chính xác: dùng easing giống CSS
+            const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic - xấp xỉ
+            const currentAngle = lastTickAngle + totalRotation * eased;
+            // Mỗi khi vượt mốc 45° mới → tick
+            const passedSteps = Math.floor((currentAngle - lastTickAngle) / 45);
+            if (passedSteps > 0) {
+                lastTickAngle += passedSteps * 45;
+                if (typeof window.playTick === 'function') {
+                    for (let i = 0; i < passedSteps; i++) window.playTick();
+                }
+            }
+            if (t < 1) {
+                requestAnimationFrame(tickLoop);
+            }
+        };
+        requestAnimationFrame(tickLoop);
 
         setTimeout(() => {
             showResult(winningIndex);
@@ -2086,7 +2119,7 @@
         createConfetti();
         createSparkles();
         createFireworks();
-        // 🎺 Trúng thưởng → mở to Tuyên Ngôn Độc Lập 100%
+        // 🎺 Trúng thưởng → giữ Tuyên Ngôn ở 80%, restart từ đầu
         if (typeof window.playTuyenNgonLoud === 'function') {
             window.playTuyenNgonLoud();
         }
@@ -2094,7 +2127,7 @@
 
     function closeModal() {
         modalOverlay.classList.remove('active');
-        // 🎺 Đóng modal → giảm volume Tuyên Ngôn về 30%
+        // 🎺 Đóng modal → fade giảm về 30%
         if (typeof window.softenTuyenNgon === 'function') {
             window.softenTuyenNgon();
         }
@@ -2163,13 +2196,19 @@
 
     <!-- ============================================
          NHẠC NỀN: ĐỌC BẢN TUYÊN NGÔN ĐỘC LẬP
-         - Lặp lại (loop), volume 50%
+         - Lặp lại (loop), volume 30% bình thường
+         - Fade lên 80% khi quay, giữ 80% khi trúng thưởng, về 30% khi đóng modal
          - Tự phát sau click/touch đầu tiên
          ============================================ -->
     <audio id="tuyenNgonAudio"
            src="assets/tuyen-ngon-doc-lap.mp3"
            preload="auto"
            loop></audio>
+
+    <!-- TIẾNG TÍCH KHI VÒNG QUAY CHẠY (45 độ / lần) -->
+    <audio id="tickAudio"
+           src="assets/tick.mp3"
+           preload="auto"></audio>
 
     <!-- NÚT LOA BẬT/TẮT (mute/unmute) - góc trên phải -->
     <button id="tnSoundBtn"
@@ -2180,28 +2219,55 @@
 
     <script>
     // ============================================
-    // TUYEN NGON DOC LAP - SOUND CONTROLLER
-    // Chỉ một file âm thanh: Tuyên Ngôn Độc Lập
-    // - Volume 50% bình thường, 100% khi trúng thưởng
-    // - Tự phát sau click/touch đầu tiên (Autoplay Policy)
-    // - Loop vô hạn
+    // AUDIO CONTROLLER - SINGLE INSTANCE
+    // - 1 audio duy nhất (Tuyên Ngôn) + 1 audio (tick)
+    // - Volume: 30% bình thường / 80% khi quay / 80% trúng thưởng
+    // - Fade-in / fade-out mượt mà
+    // - Reentrancy guard: chỉ 1 lần autoplay
     // ============================================
     (function() {
-        const audio = document.getElementById('tuyenNgonAudio');
-        const btn   = document.getElementById('tnSoundBtn');
-        if (!audio || !btn) return;
+        // ===== SINGLE INSTANCE — chỉ tạo 1 lần, không duplicate =====
+        const bgmAudio = document.getElementById('tuyenNgonAudio');
+        const tickAudio = document.getElementById('tickAudio');
+        const btn      = document.getElementById('tnSoundBtn');
+        if (!bgmAudio || !tickAudio || !btn) return;
 
-        const NORMAL_VOLUME = 0.5;   // 50% bình thường
-        const WIN_VOLUME   = 1.0;    // 100% khi trúng thưởng
+        const VOL_BASE      = 0.3;   // 30% bình thường (nhạt nhẹ)
+        const VOL_SPIN      = 0.8;   // 80% khi đang quay
+        const VOL_WIN       = 0.8;   // 80% khi trúng thưởng (giữ nguyên)
+        const VOL_AFTER_WIN = 0.3;   // 30% sau khi đóng modal
 
-        audio.volume = NORMAL_VOLUME;
-        audio.muted  = true;
+        bgmAudio.volume = VOL_BASE;
+        bgmAudio.muted  = true;
+        tickAudio.volume = 0.5;
 
         let userInteracted = false;
-        let isLoudForWin   = false;
+        let fadeRaf = null;
+
+        // ===== FADE MƯỢT GIỮA 2 MỨC ÂM LƯỢNG =====
+        function fadeVolume(audio, fromV, toV, durationMs) {
+            // Hủy fade cũ nếu đang chạy
+            if (fadeRaf) {
+                cancelAnimationFrame(fadeRaf);
+                fadeRaf = null;
+            }
+            const start = performance.now();
+            const step = (now) => {
+                const elapsed = now - start;
+                const t = Math.min(1, elapsed / durationMs);
+                audio.volume = fromV + (toV - fromV) * t;
+                if (t < 1) {
+                    fadeRaf = requestAnimationFrame(step);
+                } else {
+                    audio.volume = toV;
+                    fadeRaf = null;
+                }
+            };
+            fadeRaf = requestAnimationFrame(step);
+        }
 
         function updateBtn() {
-            if (audio.muted) {
+            if (bgmAudio.muted) {
                 btn.classList.add('muted');
                 btn.classList.remove('playing');
                 btn.textContent = '🔇';
@@ -2214,60 +2280,88 @@
             }
         }
 
-        // Click nút loa
+        function ensurePlaying() {
+            if (bgmAudio.paused) {
+                bgmAudio.play().catch(() => {});
+            }
+        }
+
+        // ===== NÚT LOA BẬT/TẮT =====
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            audio.muted = !audio.muted;
-            if (audio.muted) {
-                audio.pause();
+            userInteracted = true;
+            bgmAudio.muted = !bgmAudio.muted;
+            if (bgmAudio.muted) {
+                bgmAudio.pause();
             } else {
-                audio.muted = false;
-                audio.play().catch(() => {});
+                bgmAudio.muted = false;
+                bgmAudio.play().catch(() => {});
             }
             updateBtn();
         });
 
-        // Tự động phát khi user click/touch lần đầu (Autoplay Policy)
-        const firstInteraction = () => {
+        // ===== AUTOPLAY SAU CLICK / TOUCH ĐẦU TIÊN (chỉ 1 lần) =====
+        function firstInteraction(e) {
             if (userInteracted) return;
+            if (e && e.target && e.target.closest && e.target.closest('#tnSoundBtn')) {
+                // Click nút loa đã xử lý riêng rồi
+                return;
+            }
             userInteracted = true;
-            audio.muted = false;
-            audio.play().catch(() => {
-                audio.muted = true;
-            });
+            bgmAudio.muted = false;
+            bgmAudio.volume = VOL_BASE;
+            ensurePlaying();
+            updateBtn();
+        }
+        document.addEventListener('click',      firstInteraction, { once: true, capture: true });
+        document.addEventListener('touchstart', firstInteraction, { once: true, passive: true, capture: true });
+
+        // ============================================
+        // 🎯 PUBLIC API
+        // ============================================
+
+        // Phát tiếng "tích" theo mỗi nấc 45 độ (gọi từ spin())
+        window.playTick = function() {
+            // Mỗi lần tick dùng currentTime = 0 để phát lại từ đầu (kể cả khi file đang chạy)
+            try { tickAudio.currentTime = 0; } catch (e) {}
+            const p = tickAudio.play();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        };
+
+        // Bấm QUAY → fade từ BASE lên SPIN
+        window.boostForSpin = function() {
+            userInteracted = true;
+            bgmAudio.muted = false;
+            ensurePlaying();
+            fadeVolume(bgmAudio, bgmAudio.volume, VOL_SPIN, 600);
             updateBtn();
         };
-        document.addEventListener('click',      firstInteraction, { once: true });
-        document.addEventListener('touchstart', firstInteraction, { once: true, passive: true });
+
+        // Trúng thưởng → giữ nguyên SPIN, restart từ đầu
+        window.playTuyenNgonLoud = function() {
+            userInteracted = true;
+            bgmAudio.muted = false;
+            try { bgmAudio.currentTime = 0; } catch (e) {}
+            fadeVolume(bgmAudio, bgmAudio.volume, VOL_WIN, 300);
+            ensurePlaying();
+            updateBtn();
+        };
+
+        // Đóng modal → giảm về BASE
+        window.softenTuyenNgon = function() {
+            if (bgmAudio.muted) return;
+            fadeVolume(bgmAudio, bgmAudio.volume, VOL_AFTER_WIN, 600);
+        };
 
         // Lỗi tải audio → ẩn nút
-        audio.addEventListener('error', () => {
-            console.warn('[Tuyên Ngôn] Không tải được:', audio.src);
+        bgmAudio.addEventListener('error', () => {
+            console.warn('[Tuyên Ngôn] Không tải được:', bgmAudio.src);
             btn.style.display = 'none';
         });
-
-        // ============================================
-        // 🎯 API cho showResult() — trúng thưởng
-        // ============================================
-        window.playTuyenNgonLoud = function() {
-            if (!audio) return;
-            audio.muted = false;
-            audio.volume = WIN_VOLUME;
-            isLoudForWin = true;
-            try { audio.currentTime = 0; } catch (e) {}
-            audio.play().catch(err => console.warn('[Tuyên Ngôn]', err));
-            updateBtn();
-        };
-
-        // ============================================
-        // 🎯 API cho closeModal() — đóng modal
-        // ============================================
-        window.softenTuyenNgon = function() {
-            if (!audio || !isLoudForWin) return;
-            audio.volume = NORMAL_VOLUME;
-            isLoudForWin = false;
-            updateBtn();
-        };
+        tickAudio.addEventListener('error', () => {
+            console.warn('[Tick] Không tải được:', tickAudio.src);
+            // Tick lỗi thì im lặng — không ảnh hưởng luồng chính
+        });
 
         updateBtn();
     })();
